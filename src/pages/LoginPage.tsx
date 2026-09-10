@@ -33,14 +33,27 @@ export function LoginPage() {
     setError(null)
     try {
       const data = await signIn(email.trim(), password)
+      if (!data.user) {
+        setError('No se pudo iniciar sesión (sin usuario).')
+        return
+      }
       if (!isTransitRole(getUserRole(data.user))) {
         navigate('/unauthorized', { replace: true })
         return
       }
       const from = (location.state as LocationState | null)?.from?.pathname
       navigate(from && from !== '/login' ? from : '/', { replace: true })
-    } catch {
-      setError('Credenciales inválidas')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (/invalid login credentials/i.test(msg)) {
+        setError('Credenciales inválidas')
+      } else if (/supabase no está configurado/i.test(msg)) {
+        setError(msg)
+      } else if (msg) {
+        setError(msg)
+      } else {
+        setError('No se pudo iniciar sesión. Revisá red y configuración.')
+      }
     }
   }
 
