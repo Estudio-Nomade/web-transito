@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LiftyLogo } from '@/components/brand/LiftyLogo'
 
 type LocationState = {
   from?: { pathname?: string }
@@ -54,9 +55,10 @@ export function LoginPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-app-bg p-6">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Lifty Tránsito</CardTitle>
-          <CardDescription>Ingresá con tu cuenta de Tránsito — Villa Dolores</CardDescription>
+        <CardHeader className="items-center text-center">
+          <LiftyLogo size="lg" className="mb-2 max-h-14" alt="Lifty" />
+          <CardTitle>Tránsito · Villa Dolores</CardTitle>
+          <CardDescription>Ingresá con tu cuenta de Tránsito</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={(e) => void onSubmit(e)}>
