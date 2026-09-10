@@ -17,7 +17,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
   return (
     <div className={cn('flex h-full flex-col', className)}>
       <div className="border-b border-border px-4 py-5">
-        <LiftyLogo size="sm" className="mb-2 max-h-8" alt="Lifty" />
+        <LiftyLogo size="sm" onLightPlate plateClassName="mb-2" alt="Lifty" />
         <p className="text-sm font-semibold tracking-tight text-foreground">Tránsito</p>
         <p className="mt-0.5 text-xs text-muted-foreground">Villa Dolores</p>
       </div>

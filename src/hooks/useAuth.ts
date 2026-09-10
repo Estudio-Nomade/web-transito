@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import { isTransitRole } from '@/lib/auth-role'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -78,6 +78,11 @@ export function useAuth() {
         const bypass = createDevBypassSession()
         setSession(bypass)
         return { session: bypass, user: bypass.user }
+      }
+      if (!isSupabaseConfigured) {
+        throw new Error(
+          'Supabase no está configurado en este deploy. Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.',
+        )
       }
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
