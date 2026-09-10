@@ -1,9 +1,16 @@
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function UnauthorizedPage() {
   const { signOut, loading } = useAuth()
+  const navigate = useNavigate()
+
+  async function onSignOut() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-app-bg p-6">
@@ -20,7 +27,7 @@ export function UnauthorizedPage() {
             variant="outline"
             className="min-h-11 w-full"
             disabled={loading}
-            onClick={() => void signOut()}
+            onClick={() => void onSignOut()}
           >
             Cerrar sesión
           </Button>

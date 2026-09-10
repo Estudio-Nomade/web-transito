@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { getUserRole, isTransitRole } from '@/lib/auth-role'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,15 +19,23 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  if (initialized && session && isTransit) {
-    return <Navigate to="/" replace />
+  if (initialized && session) {
+    if (isTransit) {
+      const from = (location.state as LocationState | null)?.from?.pathname
+      return <Navigate to={from && from !== '/login' ? from : '/'} replace />
+    }
+    return <Navigate to="/unauthorized" replace />
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     try {
-      await signIn(email.trim(), password)
+      const data = await signIn(email.trim(), password)
+      if (!isTransitRole(getUserRole(data.user))) {
+        navigate('/unauthorized', { replace: true })
+        return
+      }
       const from = (location.state as LocationState | null)?.from?.pathname
       navigate(from && from !== '/login' ? from : '/', { replace: true })
     } catch {
