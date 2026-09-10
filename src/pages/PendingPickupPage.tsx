@@ -18,30 +18,33 @@ export function PendingPickupPage() {
       <Header title="Retiros pendientes" />
       {isError ? (
         <p className="text-sm text-danger">No se pudo cargar el listado de pendientes.</p>
-      ) : null}
-      <DriverTable
-        drivers={data?.data ?? []}
-        isLoading={isLoading}
-        emptyMessage="No hay retiros pendientes"
-        rowAction={(driver) => (
-          <Button
-            type="button"
-            size="sm"
-            className="min-h-11"
-            onClick={() => {
-              setSelected(driver)
-              setOpen(true)
-            }}
-          >
-            Entregar
-          </Button>
-        )}
-      />
-      {data?.meta ? (
-        <p className="text-xs text-muted-foreground">
-          {data.meta.total} pendiente{data.meta.total === 1 ? '' : 's'}
-        </p>
-      ) : null}
+      ) : (
+        <>
+          <DriverTable
+            drivers={data?.data ?? []}
+            isLoading={isLoading}
+            emptyMessage="No hay retiros pendientes"
+            rowAction={(driver) => (
+              <Button
+                type="button"
+                size="sm"
+                className="min-h-11"
+                onClick={() => {
+                  setSelected(driver)
+                  setOpen(true)
+                }}
+              >
+                Entregar
+              </Button>
+            )}
+          />
+          {data?.meta ? (
+            <p className="text-xs text-muted-foreground">
+              {data.meta.total} pendiente{data.meta.total === 1 ? '' : 's'}
+            </p>
+          ) : null}
+        </>
+      )}
       <MarkIssuedDialog
         driver={selected}
         open={open}

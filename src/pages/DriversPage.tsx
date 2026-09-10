@@ -15,13 +15,16 @@ export function DriversPage() {
       <DriverFilters value={query} onChange={setQuery} />
       {isError ? (
         <p className="text-sm text-danger">No se pudo cargar el listado de conductores.</p>
-      ) : null}
-      <DriverTable drivers={data?.data ?? []} isLoading={isLoading} />
-      {data?.meta ? (
-        <p className="text-xs text-muted-foreground">
-          {data.meta.total} conductor{data.meta.total === 1 ? '' : 'es'}
-        </p>
-      ) : null}
+      ) : (
+        <>
+          <DriverTable drivers={data?.data ?? []} isLoading={isLoading} />
+          {data?.meta ? (
+            <p className="text-xs text-muted-foreground">
+              {data.meta.total} conductor{data.meta.total === 1 ? '' : 'es'}
+            </p>
+          ) : null}
+        </>
+      )}
     </div>
   )
 }
