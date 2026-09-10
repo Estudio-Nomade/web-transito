@@ -1,22 +1,16 @@
 import { cn } from '@/lib/utils'
 
 const sizeClass = {
-  sm: 'h-7',
-  md: 'h-9',
-  lg: 'h-12',
-} as const
-
-const platePadClass = {
-  sm: 'p-2',
-  md: 'p-2.5',
-  lg: 'p-3',
+  sm: 'h-10',
+  md: 'h-14',
+  lg: 'h-20',
 } as const
 
 type LiftyLogoProps = {
   className?: string
   size?: keyof typeof sizeClass
   alt?: string
-  /** Light plate so the dark/transparent wordmark stays visible on navy/dark surfaces */
+  /** Soft translucent plate so the dark/transparent wordmark stays visible on navy/dark surfaces */
   onLightPlate?: boolean
   plateClassName?: string
 }
@@ -41,8 +35,7 @@ export function LiftyLogo({
   return (
     <div
       className={cn(
-        'flex items-center justify-center rounded-xl border border-black/5 bg-[#EDF1F5]',
-        platePadClass[size],
+        'inline-flex w-fit items-center justify-center rounded-md bg-white/80 p-1 backdrop-blur-sm',
         plateClassName,
       )}
     >

@@ -17,13 +17,7 @@ export function UnauthorizedPage() {
     <div className="flex min-h-dvh items-center justify-center bg-app-bg p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          <LiftyLogo
-            size="md"
-            onLightPlate
-            className="max-h-10"
-            plateClassName="mx-auto mb-3 w-full max-w-[10rem]"
-            alt="Lifty"
-          />
+          <LiftyLogo size="md" onLightPlate plateClassName="mx-auto mb-3" alt="Lifty" />
           <CardTitle>Acceso denegado</CardTitle>
           <CardDescription>
             No tenés permisos de Tránsito para este panel.

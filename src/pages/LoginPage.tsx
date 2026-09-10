@@ -69,13 +69,7 @@ export function LoginPage() {
     <div className="flex min-h-dvh items-center justify-center bg-app-bg p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          <LiftyLogo
-            size="lg"
-            onLightPlate
-            className="max-h-14"
-            plateClassName="mx-auto mb-3 w-full max-w-[12rem]"
-            alt="Lifty"
-          />
+          <LiftyLogo size="lg" onLightPlate plateClassName="mx-auto mb-3" alt="Lifty" />
           <CardTitle>Tránsito · Villa Dolores</CardTitle>
           <CardDescription>Ingresá con tu cuenta de Tránsito</CardDescription>
         </CardHeader>
