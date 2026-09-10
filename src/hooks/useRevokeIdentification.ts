@@ -16,7 +16,7 @@ export function useRevokeIdentification() {
       }),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: transitKeys.all })
-      toast.error(`Identificación revocada de ${data.fullName}`)
+      toast.success(`Identificación revocada de ${data.fullName}`)
     },
     onError: () => toast.error('No se pudo revocar la identificación'),
   })
