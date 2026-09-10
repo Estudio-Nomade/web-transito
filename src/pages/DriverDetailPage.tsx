@@ -85,7 +85,7 @@ export function DriverDetailPage() {
 
       {isLoading ? <DetailSkeleton /> : null}
 
-      {!isLoading && (notFound || (!driver && isError)) ? (
+      {!isLoading && notFound ? (
         <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">Conductor no encontrado</p>
           <Button asChild className="min-h-11">
@@ -95,7 +95,12 @@ export function DriverDetailPage() {
       ) : null}
 
       {!isLoading && isError && !notFound ? (
-        <p className="text-sm text-danger">No se pudo cargar el detalle del conductor.</p>
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-card px-6 py-12 text-center">
+          <p className="text-sm text-danger">No se pudo cargar el detalle del conductor.</p>
+          <Button asChild variant="outline" className="min-h-11">
+            <Link to="/drivers">Volver a conductores</Link>
+          </Button>
+        </div>
       ) : null}
 
       {!isLoading && driver ? (
