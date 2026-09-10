@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { navItems } from '@/components/layout/nav-items'
+import { LiftyLogo } from '@/components/brand/LiftyLogo'
 
 type SidebarNavProps = {
   onNavigate?: () => void
@@ -16,7 +17,8 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
   return (
     <div className={cn('flex h-full flex-col', className)}>
       <div className="border-b border-border px-4 py-5">
-        <p className="text-base font-semibold tracking-tight text-foreground">Lifty Tránsito</p>
+        <LiftyLogo size="sm" className="mb-2 max-h-8" alt="Lifty" />
+        <p className="text-sm font-semibold tracking-tight text-foreground">Tránsito</p>
         <p className="mt-0.5 text-xs text-muted-foreground">Villa Dolores</p>
       </div>
 
