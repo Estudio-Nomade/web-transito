@@ -1,22 +1,38 @@
 # web-transito
 
-Panel web de tránsito Lifty (Vite + React + TypeScript + Tailwind + shadcn).
+Panel interno Tránsito Villa Dolores (Lifty).
 
-## Run
+## Stack
+
+Vite, React 19, TypeScript, Tailwind, shadcn/ui, TanStack Query, Supabase Auth, Zustand.
+
+## Setup
 
 ```bash
 bun install
-cp .env.example .env   # fill VITE_SUPABASE_* as needed
-bun run dev            # http://localhost:5173
+cp .env.example .env
+# fill VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+# optional DEV: VITE_DEV_BYPASS_AUTH=true
+bun dev
 ```
 
-```bash
-bun run build          # production build
-bun run preview        # preview build
-```
+## Scripts
+
+- `bun dev` — http://localhost:5173
+- `bun run build`
+- `bun run preview`
+- `bun test`
 
 ## Auth
 
-- Rol requerido: `transit` en `app_metadata.role` (prioridad) o `user_metadata.role`.
-- Sin sesión → `/login`. Con sesión pero sin rol → `/unauthorized`.
-- **Bypass solo dev:** `VITE_DEV_BYPASS_AUTH=true` y `import.meta.env.DEV`. Sintetiza sesión transit. No usar en producción.
+Users need a Supabase account with `app_metadata.role` or `user_metadata.role` = `transit`.
+
+- Sin sesión → `/login`
+- Con sesión pero sin rol `transit` → `/unauthorized`
+- **Bypass solo dev:** `VITE_DEV_BYPASS_AUTH=true` y `import.meta.env.DEV`. Sintetiza sesión transit. Nunca en producción.
+
+## API
+
+Mocks in `src/mocks`. Swap `src/lib/api/transit.ts` to real `GET/POST /api/transit/*` when backend exists.
+
+Env: `VITE_API_URL` (default in `.env.example`: `http://localhost:3001/api`).
