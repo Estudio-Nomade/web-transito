@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { markIssued } from '@/lib/api/transit'
+import { ApiError } from '@/lib/api'
 import { transitKeys } from '@/lib/query-client'
 import type { MarkIssuedPayload } from '@/types/transit'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,6 +19,20 @@ export function useMarkIssued() {
       void qc.invalidateQueries({ queryKey: transitKeys.all })
       toast.success(`Identificación entregada a ${data.fullName}`)
     },
-    onError: () => toast.error('No se pudo marcar como entregado'),
+    onError: (err) => {
+      if (err instanceof ApiError) {
+        const msg =
+          err.code === 'PLATFORM_NOT_APPROVED'
+            ? 'El conductor aún no está aprobado por plataforma Lifty'
+            : err.code === 'NOT_FOUND'
+              ? 'Conductor no encontrado'
+              : err.code === 'TOKEN_REQUIRED' || err.status === 401
+                ? 'Sesión expirada; volvé a iniciar sesión'
+                : err.message || `Error ${err.status}`
+        toast.error(msg)
+        return
+      }
+      toast.error(err instanceof Error ? err.message : 'No se pudo marcar como entregado')
+    },
   })
 }
