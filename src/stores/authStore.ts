@@ -8,6 +8,7 @@ type AuthState = {
   role: string | null
   initialized: boolean
   setSession: (session: Session | null) => void
+  setRole: (role: string | null) => void
   setInitialized: (v: boolean) => void
   clear: () => void
 }
@@ -21,8 +22,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       session,
       user: session?.user ?? null,
+      // provisional from metadata until API refreshRole / fetchIsTransit
       role: getUserRole(session?.user),
     }),
+  setRole: (role) => set({ role }),
   setInitialized: (initialized) => set({ initialized }),
   clear: () => set({ session: null, user: null, role: null }),
 }))

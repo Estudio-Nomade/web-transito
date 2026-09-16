@@ -1,23 +1,70 @@
+import { supabase } from './supabase'
+
 const DEFAULT_API = 'http://localhost:3001/api'
 
 export function getApiBase(): string {
-  return import.meta.env.VITE_API_URL || DEFAULT_API
+  const raw = (import.meta.env.VITE_API_URL || DEFAULT_API).replace(/\/$/, '')
+  return raw.endsWith('/api') ? raw : `${raw}/api`
 }
 
-/** Real HTTP helper for future swap. Unused by mock path. */
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit & { token?: string } = {},
-): Promise<T> {
-  const { token, ...init } = options
-  const headers = new Headers(init.headers)
-  headers.set('Content-Type', 'application/json')
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-  const res = await fetch(`${getApiBase()}${path}`, { ...init, headers })
-  if (!res.ok) {
-    const err = new Error(`API ${res.status}`) as Error & { status: number }
-    err.status = res.status
-    throw err
+export class ApiError extends Error {
+  status: number
+  code: string
+
+  constructor(status: number, code: string, message: string) {
+    super(message)
+    this.status = status
+    this.code = code
   }
-  return res.json() as Promise<T>
+}
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) {
+    throw new ApiError(401, 'TOKEN_REQUIRED', 'Sesión requerida')
+  }
+
+  const headers = new Headers(init.headers)
+  if (!headers.has('Content-Type') && init.body) {
+    headers.set('Content-Type', 'application/json')
+  }
+  headers.set('Authorization', `Bearer ${token}`)
+
+  const res = await fetch(`${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`, {
+    ...init,
+    headers,
+  })
+
+  const text = await res.text()
+  let body: unknown = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = text
+  }
+
+  if (!res.ok) {
+    const errObj =
+      body && typeof body === 'object' && body !== null && 'error' in body
+        ? (body as { error: { code?: string; message?: string } | string }).error
+        : null
+    const code =
+      typeof errObj === 'object' && errObj?.code
+        ? errObj.code
+        : res.status === 403
+          ? 'FORBIDDEN'
+          : 'ERROR'
+    const message =
+      typeof errObj === 'object' && errObj?.message
+        ? errObj.message
+        : typeof errObj === 'string'
+          ? errObj
+          : `Error ${res.status}`
+    throw new ApiError(res.status, code, message)
+  }
+
+  return body as T
 }

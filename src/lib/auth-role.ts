@@ -9,6 +9,7 @@ export function getUserRole(user: User | null | undefined): string | null {
   return null
 }
 
+/** Transit panel: municipal transit role or Lifty admin support. */
 export function isTransitRole(role: string | null | undefined): boolean {
-  return role === 'transit'
+  return role === 'transit' || role === 'admin'
 }
