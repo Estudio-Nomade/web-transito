@@ -6,9 +6,12 @@ type AuthState = {
   session: Session | null
   user: User | null
   role: string | null
+  transitDistrictId: string | null
+  districtName: string | null
   initialized: boolean
   setSession: (session: Session | null) => void
   setRole: (role: string | null) => void
+  setDistrict: (districtId: string | null, districtName: string | null) => void
   setInitialized: (v: boolean) => void
   clear: () => void
 }
@@ -17,6 +20,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   user: null,
   role: null,
+  transitDistrictId: null,
+  districtName: null,
   initialized: false,
   setSession: (session) =>
     set({
@@ -26,6 +31,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       role: getUserRole(session?.user),
     }),
   setRole: (role) => set({ role }),
+  setDistrict: (transitDistrictId, districtName) => set({ transitDistrictId, districtName }),
   setInitialized: (initialized) => set({ initialized }),
-  clear: () => set({ session: null, user: null, role: null }),
+  clear: () =>
+    set({
+      session: null,
+      user: null,
+      role: null,
+      transitDistrictId: null,
+      districtName: null,
+    }),
 }))

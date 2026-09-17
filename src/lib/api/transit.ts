@@ -106,6 +106,28 @@ function toQuery(query: DriversQuery): string {
   return s ? `?${s}` : ''
 }
 
+export type TransitDistrict = {
+  id: string
+  name: string
+  province: string
+  status?: string
+}
+
+export async function listTransitDistricts(): Promise<{ items: TransitDistrict[] }> {
+  if (USE_MOCKS) {
+    return {
+      items: [
+        { id: 'mock-vd', name: 'Villa Dolores', province: 'Córdoba', status: 'active' },
+        { id: 'mock-nono', name: 'Nono', province: 'Córdoba', status: 'active' },
+      ],
+    }
+  }
+  const raw = await apiFetch<{ items: TransitDistrict[] }>('/transit/districts', {
+    optionalAuth: true,
+  })
+  return { items: raw.items ?? [] }
+}
+
 export async function getTransitStats(): Promise<TransitStats> {
   if (USE_MOCKS) return mockStore.getStats()
   const raw = await apiFetch<BackendStats>('/transit/stats')

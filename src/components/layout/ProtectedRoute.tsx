@@ -14,7 +14,7 @@ export function ProtectedRoute() {
     )
   }
   if (!session) {
-    return <Navigate to="/login" replace state={{ from: location }} />
+    return <Navigate to="/select-municipio" replace state={{ from: location }} />
   }
   if (!isTransit) {
     return <Navigate to="/unauthorized" replace />

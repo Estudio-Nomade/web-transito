@@ -1,7 +1,13 @@
-import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useMemo, useState, type FormEvent } from 'react'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { getUserRole, isTransitRole } from '@/lib/auth-role'
+import { defaultEmailForMunicipio } from '@/lib/municipio-credentials'
+import {
+  clearSelectedMunicipio,
+  loadSelectedMunicipio,
+  saveSelectedMunicipio,
+} from '@/lib/municipio-session'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,19 +16,42 @@ import { LiftyLogo } from '@/components/brand/LiftyLogo'
 
 type LocationState = {
   from?: { pathname?: string }
+  districtId?: string
+  districtName?: string
 }
 
 export function LoginPage() {
   const { session, isTransit, initialized, loading, signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [email, setEmail] = useState('')
+  const [searchParams] = useSearchParams()
+  const state = location.state as LocationState | null
+
+  const selected = useMemo(() => {
+    const fromStore = loadSelectedMunicipio()
+    const id = state?.districtId || searchParams.get('district') || fromStore?.id
+    const name = state?.districtName || fromStore?.name
+    if (id && name) {
+      saveSelectedMunicipio({ id, name, province: fromStore?.province })
+      return { id, name }
+    }
+    if (fromStore) return fromStore
+    return null
+  }, [state?.districtId, state?.districtName, searchParams])
+
+  const [email, setEmail] = useState(() =>
+    selected?.name ? defaultEmailForMunicipio(selected.name) : '',
+  )
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  if (initialized && !selected) {
+    return <Navigate to="/select-municipio" replace />
+  }
+
   if (initialized && session) {
     if (isTransit) {
-      const from = (location.state as LocationState | null)?.from?.pathname
+      const from = state?.from?.pathname
       return <Navigate to={from && from !== '/login' ? from : '/'} replace />
     }
     return <Navigate to="/unauthorized" replace />
@@ -41,7 +70,7 @@ export function LoginPage() {
         navigate('/unauthorized', { replace: true })
         return
       }
-      const from = (location.state as LocationState | null)?.from?.pathname
+      const from = state?.from?.pathname
       navigate(from && from !== '/login' ? from : '/', { replace: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
@@ -65,13 +94,15 @@ export function LoginPage() {
     )
   }
 
+  const municipioLabel = selected?.name ?? 'Municipio'
+
   return (
     <div className="flex min-h-dvh items-center justify-center bg-app-bg p-6">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
           <LiftyLogo size="lg" onLightPlate plateClassName="mx-auto mb-3" alt="Lifty" />
-          <CardTitle>Tránsito · Villa Dolores</CardTitle>
-          <CardDescription>Ingresá con tu cuenta de Tránsito</CardDescription>
+          <CardTitle>Tránsito · {municipioLabel}</CardTitle>
+          <CardDescription>Ingresá con la cuenta de este municipio</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={(e) => void onSubmit(e)}>
@@ -102,6 +133,19 @@ export function LoginPage() {
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button type="submit" className="min-h-11 w-full" disabled={loading}>
               {loading ? 'Ingresando…' : 'Ingresar'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 w-full"
+              asChild
+            >
+              <Link
+                to="/select-municipio"
+                onClick={() => clearSelectedMunicipio()}
+              >
+                Cambiar municipio
+              </Link>
             </Button>
           </form>
         </CardContent>
