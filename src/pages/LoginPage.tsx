@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { getUserRole, isTransitRole } from '@/lib/auth-role'
+import { isTransitRole } from '@/lib/auth-role'
+import { useAuthStore } from '@/stores/authStore'
 import { defaultEmailForMunicipio } from '@/lib/municipio-credentials'
 import {
   clearSelectedMunicipio,
@@ -66,7 +67,9 @@ export function LoginPage() {
         setError('No se pudo iniciar sesión (sin usuario).')
         return
       }
-      if (!isTransitRole(getUserRole(data.user))) {
+      // SoT is /auth/me (store.role), not JWT app_metadata — Auth UI often omits role claim
+      const roleAfter = useAuthStore.getState().role
+      if (!isTransitRole(roleAfter)) {
         navigate('/unauthorized', { replace: true })
         return
       }
