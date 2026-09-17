@@ -18,23 +18,31 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+type ApiFetchOptions = RequestInit & {
+  /** When true, skip session requirement (public endpoints e.g. /transit/districts). */
+  optionalAuth?: boolean
+}
+
+export async function apiFetch<T>(path: string, init: ApiFetchOptions = {}): Promise<T> {
+  const { optionalAuth, ...fetchInit } = init
   const {
     data: { session },
   } = await supabase.auth.getSession()
   const token = session?.access_token
-  if (!token) {
+  if (!token && !optionalAuth) {
     throw new ApiError(401, 'TOKEN_REQUIRED', 'Sesión requerida')
   }
 
-  const headers = new Headers(init.headers)
-  if (!headers.has('Content-Type') && init.body) {
+  const headers = new Headers(fetchInit.headers)
+  if (!headers.has('Content-Type') && fetchInit.body) {
     headers.set('Content-Type', 'application/json')
   }
-  headers.set('Authorization', `Bearer ${token}`)
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
 
   const res = await fetch(`${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`, {
-    ...init,
+    ...fetchInit,
     headers,
   })
 
