@@ -1,6 +1,6 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { create } from 'zustand'
-import { getUserRole } from '@/lib/auth-role'
+import { getSessionRole } from '@/lib/auth-role'
 
 type AuthState = {
   session: Session | null
@@ -31,8 +31,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       session,
       user: session?.user ?? null,
-      // provisional from metadata until API refreshRole / fetchIsTransit
-      role: getUserRole(session?.user),
+      // provisional from user object or JWT claims until /auth/me finishes
+      role: getSessionRole(session),
       roleReady: false,
     }),
   setRole: (role) => set({ role }),
