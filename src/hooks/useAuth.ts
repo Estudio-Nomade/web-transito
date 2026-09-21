@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
 import { isTransitRole } from '@/lib/auth-role'
@@ -49,22 +49,15 @@ function createDevBypassSession(): Session {
   }
 }
 
-async function fetchIsTransit(): Promise<boolean> {
+async function fetchMe(accessToken?: string | null): Promise<AuthMe | null> {
   try {
-    const me = await apiFetch<AuthMe>('/auth/me')
-    return isTransitRole(me.role)
+    return await apiFetch<AuthMe>('/auth/me', { accessToken })
   } catch (err) {
+    // Do NOT fall back to /transit/stats: 403 can mean "no municipality" with valid role.
     if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-      return false
+      return null
     }
-    try {
-      await apiFetch('/transit/stats')
-      return true
-    } catch (e) {
-      const status = (e as { status?: number }).status
-      if (status === 403 || status === 401) return false
-      return false
-    }
+    return null
   }
 }
 
@@ -88,22 +81,55 @@ export function useAuth() {
     transitDistrictId,
     districtName,
     initialized,
+    roleReady,
     setSession,
     setRole,
     setDistrict,
     setInitialized,
+    setRoleReady,
     clear,
   } = useAuthStore()
   const [loading, setLoading] = useState(false)
+  const resolveGen = useRef(0)
 
-  const applyMe = useCallback(
-    async (setRoleFn: (r: string | null) => void) => {
-      const me = await apiFetch<AuthMe>('/auth/me')
-      setRoleFn(me.role)
-      applyMeDistrict(me, setDistrict)
-      return me
+  const resolveRole = useCallback(
+    async (next: Session | null): Promise<boolean> => {
+      const gen = ++resolveGen.current
+      setSession(next)
+      if (!next) {
+        // Only the latest resolve may clear ready state
+        if (gen !== resolveGen.current) return false
+        setRole(null)
+        setDistrict(null, null)
+        setRoleReady(true)
+        return false
+      }
+      setRoleReady(false)
+      // Use token from the session callback — getSession() races during auth transitions.
+      let ok = false
+      try {
+        const me = await fetchMe(next.access_token)
+        // Stale resolve: a newer one is in flight — do not touch roleReady (newer owns it).
+        if (gen !== resolveGen.current) return false
+        if (!me || !isTransitRole(me.role)) {
+          setRole(null)
+          setDistrict(null, null)
+          ok = false
+        } else {
+          setRole(me.role)
+          applyMeDistrict(me, setDistrict)
+          ok = true
+        }
+      } catch {
+        if (gen !== resolveGen.current) return false
+        setRole(null)
+        setDistrict(null, null)
+        ok = false
+      }
+      if (gen === resolveGen.current) setRoleReady(true)
+      return ok
     },
-    [setDistrict],
+    [setSession, setRole, setDistrict, setRoleReady],
   )
 
   const refreshRole = useCallback(async () => {
@@ -111,21 +137,11 @@ export function useAuth() {
       setRole('transit')
       const sel = loadSelectedMunicipio()
       setDistrict(sel?.id ?? null, sel?.name ?? 'Dev')
+      setRoleReady(true)
       return true
     }
-    const ok = await fetchIsTransit()
-    if (ok) {
-      try {
-        await applyMe(setRole)
-      } catch {
-        setRole('transit')
-      }
-    } else {
-      setRole(null)
-      setDistrict(null, null)
-    }
-    return ok
-  }, [setRole, setDistrict, applyMe])
+    return resolveRole(useAuthStore.getState().session)
+  }, [setRole, setDistrict, setRoleReady, resolveRole])
 
   useEffect(() => {
     let mounted = true
@@ -136,6 +152,7 @@ export function useAuth() {
         setRole('transit')
         const sel = loadSelectedMunicipio()
         setDistrict(sel?.id ?? 'dev-district', sel?.name ?? 'Dev')
+        setRoleReady(true)
       }
       setInitialized(true)
       return () => {
@@ -145,49 +162,20 @@ export function useAuth() {
 
     void supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return
-      setSession(data.session)
-      if (data.session) {
-        const ok = await fetchIsTransit()
-        if (!mounted) return
-        if (ok) {
-          try {
-            await applyMe(setRole)
-          } catch {
-            if (mounted) setRole('transit')
-          }
-        } else {
-          setRole(null)
-        }
-      }
+      await resolveRole(data.session)
       if (mounted) setInitialized(true)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next)
-      if (!next) {
-        setRole(null)
-        setDistrict(null, null)
-      } else {
-        void fetchIsTransit().then(async (ok) => {
-          if (!mounted) return
-          if (ok) {
-            try {
-              await applyMe(setRole)
-            } catch {
-              if (mounted) setRole('transit')
-            }
-          } else {
-            setRole(null)
-          }
-        })
-      }
+      // Fire-and-forget; resolveRole serializes via resolveGen
+      void resolveRole(next)
     })
 
     return () => {
       mounted = false
       sub.subscription.unsubscribe()
     }
-  }, [setSession, setRole, setDistrict, setInitialized, applyMe])
+  }, [setSession, setRole, setDistrict, setInitialized, setRoleReady, resolveRole])
 
   async function signIn(email: string, password: string) {
     setLoading(true)
@@ -199,28 +187,28 @@ export function useAuth() {
         setRole('transit')
         const sel = loadSelectedMunicipio()
         setDistrict(sel?.id ?? 'dev-district', sel?.name ?? 'Dev')
-        return { session: bypass, user: bypass.user }
+        setRoleReady(true)
+        return { session: bypass, user: bypass.user, isTransit: true }
       }
       if (!isSupabaseConfigured) {
         throw new Error(
           'Supabase no está configurado en este deploy. Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (proyecto Lifty wabdd).',
         )
       }
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const emailNorm = email.trim().toLowerCase()
+      const passwordNorm = password.normalize('NFKC').trim()
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailNorm,
+        password: passwordNorm,
+      })
       if (error) throw error
-      setSession(data.session)
-      const ok = await fetchIsTransit()
+      const ok = await resolveRole(data.session)
       if (!ok) {
         await supabase.auth.signOut()
         clear()
         throw new Error('Tu cuenta no tiene rol tránsito/admin en Lifty.')
       }
-      try {
-        await applyMe(setRole)
-      } catch {
-        setRole('transit')
-      }
-      return data
+      return { session: data.session, user: data.user, isTransit: true }
     } finally {
       setLoading(false)
     }
@@ -255,6 +243,7 @@ export function useAuth() {
     districtName: displayDistrictName,
     isTransit: isTransitRole(role),
     initialized,
+    roleReady,
     loading,
     signIn,
     signOut,

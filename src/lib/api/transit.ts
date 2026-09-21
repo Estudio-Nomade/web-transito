@@ -114,12 +114,10 @@ export type TransitDistrict = {
 }
 
 export async function listTransitDistricts(): Promise<{ items: TransitDistrict[] }> {
+  // Mocks only when explicitly enabled — single sample district (mirrors ops-with-operator shape).
   if (USE_MOCKS) {
     return {
-      items: [
-        { id: 'mock-vd', name: 'Villa Dolores', province: 'Córdoba', status: 'active' },
-        { id: 'mock-nono', name: 'Nono', province: 'Córdoba', status: 'active' },
-      ],
+      items: [{ id: 'mock-vd', name: 'Villa Dolores', province: 'Córdoba', status: 'active' }],
     }
   }
   const raw = await apiFetch<{ items: TransitDistrict[] }>('/transit/districts', {
