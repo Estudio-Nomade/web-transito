@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import type { User } from '@supabase/supabase-js'
-import { getUserRole, isTransitRole } from './auth-role'
+import type { Session, User } from '@supabase/supabase-js'
+import {
+  getRoleFromAccessToken,
+  getSessionRole,
+  getUserRole,
+  isTransitRole,
+} from './auth-role'
 
 function user(partial: {
   app?: Record<string, unknown>
@@ -15,6 +20,18 @@ function user(partial: {
     user_metadata: partial.meta ?? {},
     created_at: '',
   } as User
+}
+
+function jwtWithAppRole(role: string): string {
+  const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }))
+  const payload = btoa(
+    JSON.stringify({
+      sub: 'u1',
+      app_metadata: { role },
+      user_metadata: {},
+    }),
+  )
+  return `${header}.${payload}.sig`
 }
 
 describe('isTransitRole', () => {
@@ -47,5 +64,27 @@ describe('getUserRole', () => {
   test('null when missing', () => {
     expect(getUserRole(user({}))).toBe(null)
     expect(getUserRole(null)).toBe(null)
+  })
+})
+
+describe('getRoleFromAccessToken', () => {
+  test('reads app_metadata.role from JWT payload', () => {
+    expect(getRoleFromAccessToken(jwtWithAppRole('transit'))).toBe('transit')
+  })
+
+  test('null on garbage', () => {
+    expect(getRoleFromAccessToken('not-a-jwt')).toBe(null)
+    expect(getRoleFromAccessToken(null)).toBe(null)
+  })
+})
+
+describe('getSessionRole', () => {
+  test('uses JWT when user object has no role metadata', () => {
+    const session = {
+      access_token: jwtWithAppRole('transit'),
+      user: user({}),
+    } as Session
+    expect(getUserRole(session.user)).toBe(null)
+    expect(getSessionRole(session)).toBe('transit')
   })
 })

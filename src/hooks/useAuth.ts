@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
-import { getUserRole, isTransitRole } from '@/lib/auth-role'
+import { getSessionRole, isTransitRole } from '@/lib/auth-role'
 import { apiFetch, ApiError } from '@/lib/api'
 import {
   clearSelectedMunicipio,
@@ -26,8 +26,8 @@ type AuthMe = {
 
 type MeResult =
   | { kind: 'ok'; me: AuthMe }
-  | { kind: 'denied' } // 401/403 or role not transit/admin
-  | { kind: 'unavailable' } // network / 5xx — do not treat as denied
+  | { kind: 'denied' }
+  | { kind: 'unavailable' }
 
 /** Coalesce concurrent resolveRole for the same access token (signIn + onAuthStateChange). */
 const inflightByToken = new Map<string, Promise<boolean>>()
@@ -87,14 +87,18 @@ function applyMeDistrict(
   }
 }
 
+/**
+ * Allow panel access from JWT claims when /auth/me is down, flaky, or returns
+ * a non-transit role while Auth app_metadata still says transit (ops reset path).
+ */
 function applyJwtFallback(
   session: Session,
   setRole: (role: string | null) => void,
   setDistrict: (id: string | null, name: string | null) => void,
 ): boolean {
-  const jwtRole = getUserRole(session.user)
+  const jwtRole = getSessionRole(session)
   if (!isTransitRole(jwtRole)) return false
-  setRole(jwtRole)
+  setRole(jwtRole as string)
   const sel = loadSelectedMunicipio()
   if (sel?.id) {
     setDistrict(sel.id, sel.name)
@@ -132,12 +136,18 @@ export function useAuth() {
 
       setRoleReady(false)
 
+      // Provisional from JWT so UI never sits as "sin rol" while /auth/me is in flight.
+      const provisional = getSessionRole(next)
+      if (isTransitRole(provisional)) {
+        setRole(provisional)
+      }
+
       const result = await fetchMeResult(next.access_token)
 
-      // Session may have been cleared by signOut while we waited.
       const still = useAuthStore.getState().session
       if (!still || still.access_token !== next.access_token) {
-        return false
+        // Do not leave roleReady=false forever if we were superseded.
+        return isTransitRole(useAuthStore.getState().role)
       }
 
       if (result.kind === 'ok') {
@@ -147,22 +157,15 @@ export function useAuth() {
         return true
       }
 
-      if (result.kind === 'unavailable') {
-        // Transient API failure: keep JWT transit/admin so UI does not flash Acceso denegado.
-        const ok = applyJwtFallback(next, setRole, setDistrict)
-        if (!ok) {
-          setRole(null)
-          setDistrict(null, null)
-        }
-        setRoleReady(true)
-        return ok
+      // API denied or unavailable: if JWT still says transit/admin, allow entry.
+      // Hard deny only when neither API nor JWT grants transit.
+      const ok = applyJwtFallback(next, setRole, setDistrict)
+      if (!ok) {
+        setRole(null)
+        setDistrict(null, null)
       }
-
-      // denied
-      setRole(null)
-      setDistrict(null, null)
       setRoleReady(true)
-      return false
+      return ok
     },
     [setSession, setRole, setDistrict, setRoleReady],
   )
@@ -195,7 +198,11 @@ export function useAuth() {
       setRoleReady(true)
       return true
     }
-    return resolveRole(useAuthStore.getState().session)
+    const current = useAuthStore.getState().session
+    if (!current) return false
+    // Bust coalesce cache so retry always hits /auth/me again.
+    inflightByToken.delete(current.access_token)
+    return resolveRole(current)
   }, [setRole, setDistrict, setRoleReady, resolveRole])
 
   useEffect(() => {
@@ -260,18 +267,22 @@ export function useAuth() {
         throw new Error('No se pudo iniciar sesión (sin sesión).')
       }
 
-      // Shares inflight with onAuthStateChange(SIGNED_IN) for the same token.
       const ok = await resolveRole(data.session)
       if (!ok) {
-        // If store already has transit (another resolve won), treat as success.
         const st = useAuthStore.getState()
         if (st.session && isTransitRole(st.role) && st.roleReady) {
+          return { session: data.session, user: data.user, isTransit: true }
+        }
+        // Last chance: JWT claims on the fresh session (do not sign out if transit).
+        if (isTransitRole(getSessionRole(data.session))) {
+          setRole(getSessionRole(data.session))
+          setRoleReady(true)
           return { session: data.session, user: data.user, isTransit: true }
         }
         await supabase.auth.signOut()
         clear()
         throw new Error(
-          'Tu cuenta no tiene rol tránsito/admin en Lifty (API /auth/me). Si el mail/pass están bien, pedí reset en admin ops.',
+          'Tu cuenta no tiene rol tránsito/admin en Lifty (JWT ni /auth/me). Pedí alta/reset en admin ops.',
         )
       }
       return { session: data.session, user: data.user, isTransit: true }
