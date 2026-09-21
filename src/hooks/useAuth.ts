@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from '@/lib/supabase'
-import { isTransitRole } from '@/lib/auth-role'
+import { getUserRole, isTransitRole } from '@/lib/auth-role'
 import { apiFetch, ApiError } from '@/lib/api'
-import { clearSelectedMunicipio, loadSelectedMunicipio, saveSelectedMunicipio } from '@/lib/municipio-session'
+import {
+  clearSelectedMunicipio,
+  loadSelectedMunicipio,
+  saveSelectedMunicipio,
+} from '@/lib/municipio-session'
 import { useAuthStore } from '@/stores/authStore'
 
 const DEV_BYPASS =
@@ -19,6 +23,14 @@ type AuthMe = {
   transit_district_id?: string | null
   district_name?: string | null
 }
+
+type MeResult =
+  | { kind: 'ok'; me: AuthMe }
+  | { kind: 'denied' } // 401/403 or role not transit/admin
+  | { kind: 'unavailable' } // network / 5xx — do not treat as denied
+
+/** Coalesce concurrent resolveRole for the same access token (signIn + onAuthStateChange). */
+const inflightByToken = new Map<string, Promise<boolean>>()
 
 function createDevBypassSession(): Session {
   const now = Math.floor(Date.now() / 1000)
@@ -49,20 +61,22 @@ function createDevBypassSession(): Session {
   }
 }
 
-async function fetchMe(accessToken?: string | null): Promise<AuthMe | null> {
+async function fetchMeResult(accessToken?: string | null): Promise<MeResult> {
   try {
-    return await apiFetch<AuthMe>('/auth/me', { accessToken })
+    const me = await apiFetch<AuthMe>('/auth/me', { accessToken })
+    if (!me || !isTransitRole(me.role)) return { kind: 'denied' }
+    return { kind: 'ok', me }
   } catch (err) {
-    // Do NOT fall back to /transit/stats: 403 can mean "no municipality" with valid role.
-    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-      return null
+    if (err instanceof ApiError) {
+      if (err.status === 401 || err.status === 403) return { kind: 'denied' }
+      return { kind: 'unavailable' }
     }
-    return null
+    return { kind: 'unavailable' }
   }
 }
 
 function applyMeDistrict(
-  me: AuthMe,
+  me: Pick<AuthMe, 'transit_district_id' | 'district_name'>,
   setDistrict: (id: string | null, name: string | null) => void,
 ) {
   const id = me.transit_district_id ?? null
@@ -71,6 +85,21 @@ function applyMeDistrict(
   if (id && name) {
     saveSelectedMunicipio({ id, name })
   }
+}
+
+function applyJwtFallback(
+  session: Session,
+  setRole: (role: string | null) => void,
+  setDistrict: (id: string | null, name: string | null) => void,
+): boolean {
+  const jwtRole = getUserRole(session.user)
+  if (!isTransitRole(jwtRole)) return false
+  setRole(jwtRole)
+  const sel = loadSelectedMunicipio()
+  if (sel?.id) {
+    setDistrict(sel.id, sel.name)
+  }
+  return true
 }
 
 export function useAuth() {
@@ -90,46 +119,72 @@ export function useAuth() {
     clear,
   } = useAuthStore()
   const [loading, setLoading] = useState(false)
-  const resolveGen = useRef(0)
 
-  const resolveRole = useCallback(
+  const resolveRoleOnce = useCallback(
     async (next: Session | null): Promise<boolean> => {
-      const gen = ++resolveGen.current
       setSession(next)
       if (!next) {
-        // Only the latest resolve may clear ready state
-        if (gen !== resolveGen.current) return false
         setRole(null)
         setDistrict(null, null)
         setRoleReady(true)
         return false
       }
+
       setRoleReady(false)
-      // Use token from the session callback — getSession() races during auth transitions.
-      let ok = false
-      try {
-        const me = await fetchMe(next.access_token)
-        // Stale resolve: a newer one is in flight — do not touch roleReady (newer owns it).
-        if (gen !== resolveGen.current) return false
-        if (!me || !isTransitRole(me.role)) {
+
+      const result = await fetchMeResult(next.access_token)
+
+      // Session may have been cleared by signOut while we waited.
+      const still = useAuthStore.getState().session
+      if (!still || still.access_token !== next.access_token) {
+        return false
+      }
+
+      if (result.kind === 'ok') {
+        setRole(result.me.role)
+        applyMeDistrict(result.me, setDistrict)
+        setRoleReady(true)
+        return true
+      }
+
+      if (result.kind === 'unavailable') {
+        // Transient API failure: keep JWT transit/admin so UI does not flash Acceso denegado.
+        const ok = applyJwtFallback(next, setRole, setDistrict)
+        if (!ok) {
           setRole(null)
           setDistrict(null, null)
-          ok = false
-        } else {
-          setRole(me.role)
-          applyMeDistrict(me, setDistrict)
-          ok = true
         }
-      } catch {
-        if (gen !== resolveGen.current) return false
-        setRole(null)
-        setDistrict(null, null)
-        ok = false
+        setRoleReady(true)
+        return ok
       }
-      if (gen === resolveGen.current) setRoleReady(true)
-      return ok
+
+      // denied
+      setRole(null)
+      setDistrict(null, null)
+      setRoleReady(true)
+      return false
     },
     [setSession, setRole, setDistrict, setRoleReady],
+  )
+
+  const resolveRole = useCallback(
+    async (next: Session | null): Promise<boolean> => {
+      if (!next?.access_token) {
+        return resolveRoleOnce(next)
+      }
+      const token = next.access_token
+      const existing = inflightByToken.get(token)
+      if (existing) return existing
+
+      const promise = resolveRoleOnce(next).finally(() => {
+        if (inflightByToken.get(token) === promise) {
+          inflightByToken.delete(token)
+        }
+      })
+      inflightByToken.set(token, promise)
+      return promise
+    },
+    [resolveRoleOnce],
   )
 
   const refreshRole = useCallback(async () => {
@@ -167,7 +222,6 @@ export function useAuth() {
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      // Fire-and-forget; resolveRole serializes via resolveGen
       void resolveRole(next)
     })
 
@@ -202,11 +256,23 @@ export function useAuth() {
         password: passwordNorm,
       })
       if (error) throw error
+      if (!data.session) {
+        throw new Error('No se pudo iniciar sesión (sin sesión).')
+      }
+
+      // Shares inflight with onAuthStateChange(SIGNED_IN) for the same token.
       const ok = await resolveRole(data.session)
       if (!ok) {
+        // If store already has transit (another resolve won), treat as success.
+        const st = useAuthStore.getState()
+        if (st.session && isTransitRole(st.role) && st.roleReady) {
+          return { session: data.session, user: data.user, isTransit: true }
+        }
         await supabase.auth.signOut()
         clear()
-        throw new Error('Tu cuenta no tiene rol tránsito/admin en Lifty.')
+        throw new Error(
+          'Tu cuenta no tiene rol tránsito/admin en Lifty (API /auth/me). Si el mail/pass están bien, pedí reset en admin ops.',
+        )
       }
       return { session: data.session, user: data.user, isTransit: true }
     } finally {
@@ -232,8 +298,7 @@ export function useAuth() {
     }
   }
 
-  const displayDistrictName =
-    districtName || loadSelectedMunicipio()?.name || null
+  const displayDistrictName = districtName || loadSelectedMunicipio()?.name || null
 
   return {
     session,
