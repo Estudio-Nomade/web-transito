@@ -49,7 +49,8 @@ export function LoginPage() {
   }
 
   if (initialized && session) {
-    if (!roleReady) {
+    // JWT provisional may unlock isTransit before roleReady finalizes /auth/me.
+    if (!roleReady && !isTransit) {
       return (
         <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
           Verificando permisos…
@@ -60,7 +61,14 @@ export function LoginPage() {
       const from = state?.from?.pathname
       return <Navigate to={from && from !== '/login' ? from : '/'} replace />
     }
-    return <Navigate to="/unauthorized" replace />
+    if (roleReady) {
+      return <Navigate to="/unauthorized" replace />
+    }
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
+        Verificando permisos…
+      </div>
+    )
   }
 
   async function onSubmit(e: FormEvent) {

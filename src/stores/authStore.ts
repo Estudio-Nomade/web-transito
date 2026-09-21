@@ -28,12 +28,27 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialized: false,
   roleReady: false,
   setSession: (session) =>
-    set({
-      session,
-      user: session?.user ?? null,
-      // provisional from user object or JWT claims until /auth/me finishes
-      role: getSessionRole(session),
-      roleReady: false,
+    set((state) => {
+      const sameToken =
+        !!session?.access_token && state.session?.access_token === session.access_token
+      const provisional = getSessionRole(session)
+      // Keep roleReady if same token already resolved, or JWT already grants transit
+      // (avoids infinite "Cargando…" while /auth/me re-runs on remount/TOKEN_REFRESHED).
+      const roleReady =
+        !session
+          ? true
+          : sameToken && state.roleReady
+            ? true
+            : provisional === 'transit' || provisional === 'admin'
+              ? true
+              : false
+      return {
+        session,
+        user: session?.user ?? null,
+        // provisional from user object or JWT claims until /auth/me finishes
+        role: provisional ?? (sameToken ? state.role : null),
+        roleReady,
+      }
     }),
   setRole: (role) => set({ role }),
   setDistrict: (transitDistrictId, districtName) => set({ transitDistrictId, districtName }),
