@@ -3,10 +3,10 @@ import { useAuth } from '@/hooks/useAuth'
 import { AppShell } from './AppShell'
 
 export function ProtectedRoute() {
-  const { initialized, session, isTransit } = useAuth()
+  const { initialized, roleReady, session, isTransit } = useAuth()
   const location = useLocation()
 
-  if (!initialized) {
+  if (!initialized || (session && !roleReady)) {
     return (
       <div className="flex h-full min-h-dvh items-center justify-center text-muted-foreground">
         Cargando…

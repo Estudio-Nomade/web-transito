@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { listTransitDistricts, type TransitDistrict } from '@/lib/api/transit'
-import { FALLBACK_MUNICIPIOS } from '@/lib/municipio-credentials'
 import { saveSelectedMunicipio } from '@/lib/municipio-session'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +15,20 @@ export function SelectMunicipioPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await listTransitDistricts()
+      setItems(res.items ?? [])
+    } catch {
+      setItems([])
+      setError('No se pudo cargar la lista de municipios. Revisá la conexión e intentá de nuevo.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     let mounted = true
     void (async () => {
@@ -24,11 +37,11 @@ export function SelectMunicipioPage() {
       try {
         const res = await listTransitDistricts()
         if (!mounted) return
-        setItems(res.items.length > 0 ? res.items : FALLBACK_MUNICIPIOS)
+        setItems(res.items ?? [])
       } catch {
         if (!mounted) return
-        setItems(FALLBACK_MUNICIPIOS)
-        setError('No se pudo cargar la lista desde el servidor; mostrando municipios conocidos.')
+        setItems([])
+        setError('No se pudo cargar la lista de municipios. Revisá la conexión e intentá de nuevo.')
       } finally {
         if (mounted) setLoading(false)
       }
@@ -63,6 +76,18 @@ export function SelectMunicipioPage() {
         <CardContent>
           {loading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Cargando municipios…</p>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => void load()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : items.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No hay municipios habilitados. Pedile a Lifty que dé de alta el operador de tránsito en el
+              panel admin.
+            </p>
           ) : (
             <ul className="flex flex-col gap-2">
               {items.map((d) => (
@@ -85,7 +110,6 @@ export function SelectMunicipioPage() {
               ))}
             </ul>
           )}
-          {error ? <p className="mt-3 text-xs text-muted-foreground">{error}</p> : null}
         </CardContent>
       </Card>
     </div>

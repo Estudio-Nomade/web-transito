@@ -9,10 +9,13 @@ type AuthState = {
   transitDistrictId: string | null
   districtName: string | null
   initialized: boolean
+  /** False while session exists but /auth/me role check is still in flight. */
+  roleReady: boolean
   setSession: (session: Session | null) => void
   setRole: (role: string | null) => void
   setDistrict: (districtId: string | null, districtName: string | null) => void
   setInitialized: (v: boolean) => void
+  setRoleReady: (v: boolean) => void
   clear: () => void
 }
 
@@ -23,16 +26,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   transitDistrictId: null,
   districtName: null,
   initialized: false,
+  roleReady: false,
   setSession: (session) =>
     set({
       session,
       user: session?.user ?? null,
       // provisional from metadata until API refreshRole / fetchIsTransit
       role: getUserRole(session?.user),
+      roleReady: false,
     }),
   setRole: (role) => set({ role }),
   setDistrict: (transitDistrictId, districtName) => set({ transitDistrictId, districtName }),
   setInitialized: (initialized) => set({ initialized }),
+  setRoleReady: (roleReady) => set({ roleReady }),
   clear: () =>
     set({
       session: null,
@@ -40,5 +46,6 @@ export const useAuthStore = create<AuthState>((set) => ({
       role: null,
       transitDistrictId: null,
       districtName: null,
+      roleReady: true,
     }),
 }))

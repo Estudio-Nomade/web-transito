@@ -1,7 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { getUserRole, isTransitRole } from '@/lib/auth-role'
 import { defaultEmailForMunicipio } from '@/lib/municipio-credentials'
 import {
   clearSelectedMunicipio,
@@ -21,7 +20,7 @@ type LocationState = {
 }
 
 export function LoginPage() {
-  const { session, isTransit, initialized, loading, signIn } = useAuth()
+  const { session, isTransit, initialized, roleReady, loading, signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -50,6 +49,13 @@ export function LoginPage() {
   }
 
   if (initialized && session) {
+    if (!roleReady) {
+      return (
+        <div className="flex min-h-dvh items-center justify-center text-muted-foreground">
+          Verificando permisos…
+        </div>
+      )
+    }
     if (isTransit) {
       const from = state?.from?.pathname
       return <Navigate to={from && from !== '/login' ? from : '/'} replace />
@@ -61,12 +67,12 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     try {
-      const data = await signIn(email.trim(), password)
+      const data = await signIn(email, password)
       if (!data.user) {
         setError('No se pudo iniciar sesión (sin usuario).')
         return
       }
-      if (!isTransitRole(getUserRole(data.user))) {
+      if (!data.isTransit) {
         navigate('/unauthorized', { replace: true })
         return
       }
@@ -74,8 +80,13 @@ export function LoginPage() {
       navigate(from && from !== '/login' ? from : '/', { replace: true })
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
+      // Supabase Auth only — not role/API. Keep the real reason visible for ops.
       if (/invalid login credentials/i.test(msg)) {
-        setError('Credenciales inválidas')
+        setError(
+          'Credenciales inválidas (Auth). Revisá mail y contraseña de esta cuenta en Supabase wabdd — no es un error de permisos del panel.',
+        )
+      } else if (/email not confirmed/i.test(msg)) {
+        setError('Email no confirmado en Auth. Marcá confirm en Supabase o reenviá el mail.')
       } else if (/supabase no está configurado/i.test(msg)) {
         setError(msg)
       } else if (msg) {

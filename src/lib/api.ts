@@ -21,14 +21,19 @@ export class ApiError extends Error {
 type ApiFetchOptions = RequestInit & {
   /** When true, skip session requirement (public endpoints e.g. /transit/districts). */
   optionalAuth?: boolean
+  /** Prefer this token over supabase.auth.getSession() (avoids auth-transition races). */
+  accessToken?: string | null
 }
 
 export async function apiFetch<T>(path: string, init: ApiFetchOptions = {}): Promise<T> {
-  const { optionalAuth, ...fetchInit } = init
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  const token = session?.access_token
+  const { optionalAuth, accessToken, ...fetchInit } = init
+  let token = accessToken ?? null
+  if (!token) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    token = session?.access_token ?? null
+  }
   if (!token && !optionalAuth) {
     throw new ApiError(401, 'TOKEN_REQUIRED', 'Sesión requerida')
   }
