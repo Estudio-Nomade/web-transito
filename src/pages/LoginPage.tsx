@@ -116,6 +116,7 @@ export function LoginPage() {
   }
 
   const municipioLabel = selected?.name ?? 'Municipio'
+  const isLiftyOps = selected?.id === 'lifty-ops'
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-app-bg p-6">
@@ -123,7 +124,11 @@ export function LoginPage() {
         <CardHeader className="items-center text-center">
           <LiftyLogo size="lg" onLightPlate plateClassName="mx-auto mb-3" alt="Lifty" />
           <CardTitle>Tránsito · {municipioLabel}</CardTitle>
-          <CardDescription>Ingresá con la cuenta de este municipio</CardDescription>
+          <CardDescription>
+            {isLiftyOps
+              ? 'Cuenta Lifty (transito@) — ves todos los municipios habilitados'
+              : 'Ingresá con la cuenta de este municipio'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4" onSubmit={(e) => void onSubmit(e)}>

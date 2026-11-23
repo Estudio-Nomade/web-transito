@@ -27,6 +27,7 @@ export function slugForMunicipioName(name: string): string | null {
 }
 
 export function defaultEmailForMunicipio(name: string): string {
+  if (/^lifty/i.test(name.trim())) return `transito@${EMAIL_DOMAIN}`
   const slug = slugForMunicipioName(name) ?? 'transito'
   return `${slug}@${EMAIL_DOMAIN}`
 }

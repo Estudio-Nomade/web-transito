@@ -3,7 +3,11 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { listTransitDistricts, type TransitDistrict } from '@/lib/api/transit'
-import { saveSelectedMunicipio } from '@/lib/municipio-session'
+import {
+  LIFTY_OPS_MUNICIPIO_ID,
+  LIFTY_OPS_MUNICIPIO_NAME,
+  saveSelectedMunicipio,
+} from '@/lib/municipio-session'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LiftyLogo } from '@/components/brand/LiftyLogo'
@@ -69,11 +73,29 @@ export function SelectMunicipioPage() {
           <LiftyLogo size="lg" onLightPlate plateClassName="mx-auto mb-3" alt="Lifty" />
           <CardTitle>Elegí tu municipio</CardTitle>
           <CardDescription>
-            Panel de Tránsito Lifty. Seleccioná el municipio para ingresar con la cuenta local.
+            Panel de Tránsito Lifty. Cada municipio entra con su cuenta local; Lifty ve todos.
             {districtName ? ` (última sesión: ${districtName})` : null}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <Button
+            type="button"
+            variant="default"
+            className="h-auto min-h-12 w-full justify-start gap-3 px-4 py-3 text-left"
+            onClick={() =>
+              onSelect({
+                id: LIFTY_OPS_MUNICIPIO_ID,
+                name: LIFTY_OPS_MUNICIPIO_NAME,
+                province: 'Operaciones Lifty',
+              })
+            }
+          >
+            <MapPin className="size-5 shrink-0" aria-hidden />
+            <span className="flex min-w-0 flex-col">
+              <span className="font-medium">{LIFTY_OPS_MUNICIPIO_NAME}</span>
+              <span className="text-xs opacity-90">Cuenta transito@ · todos los municipios</span>
+            </span>
+          </Button>
           {loading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Cargando municipios…</p>
           ) : error ? (
